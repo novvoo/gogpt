@@ -1,1 +1,2 @@
-![gopgt](images/demo.png)
+![demo](images/demo.png)
+![zh](images/zh.png)
