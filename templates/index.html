@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MicroGPT - Go 训练平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); }
+        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <header class="text-center mb-12">
+            <h1 class="text-5xl font-bold mb-4 gradient-text">MicroGPT</h1>
+            <p class="text-gray-400 text-lg">纯 Go 语言实现的 Transformer 训练平台</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 左侧：数据上传和配置 -->
+            <div class="space-y-6">
+                <!-- 数据上传 -->
+                <div class="glass rounded-2xl p-6 border border-gray-700">
+                    <h2 class="text-2xl font-semibold mb-4 flex items-center">
+                        <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                        数据上传
+                    </h2>
+                    <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-blue-500 transition-colors cursor-pointer" onclick="document.getElementById('fileInput').click()">
+                        <input type="file" id="fileInput" class="hidden" accept=".txt" onchange="uploadFile(this)">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <p class="text-gray-400">点击上传 .txt 文件（每行一个训练样本）</p>
+                        <p class="text-sm text-gray-500 mt-2" id="uploadStatus"></p>
+                    </div>
+                </div>
+
+                <!-- 模型配置 -->
+                <div class="glass rounded-2xl p-6 border border-gray-700">
+                    <h2 class="text-2xl font-semibold mb-4 flex items-center">
+                        <span class="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
+                        模型配置
+                    </h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">嵌入维度 (n_embd)</label>
+                            <input type="number" id="n_embd" value="32" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">层数 (n_layer)</label>
+                            <input type="number" id="n_layer" value="3" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">注意力头数 (n_head)</label>
+                            <input type="number" id="n_head" value="4" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">序列长度 (block_size)</label>
+                            <input type="number" id="block_size" value="32" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">训练步数</label>
+                            <input type="number" id="num_steps" value="1000" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">学习率</label>
+                            <input type="number" id="learning_rate" value="0.01" step="0.001" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex gap-3">
+                        <button onclick="startTraining()" id="trainBtn" class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                            开始训练
+                        </button>
+                        <button onclick="stopTraining()" class="px-6 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-xl transition-all">
+                            停止
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 生成测试 -->
+                <div class="glass rounded-2xl p-6 border border-gray-700">
+                    <h2 class="text-2xl font-semibold mb-4 flex items-center">
+                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                        文本生成
+                    </h2>
+                    <div class="space-y-3">
+                        <input type="text" id="prompt" placeholder="输入提示词..." class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-green-500">
+                        <div class="flex gap-3">
+                            <input type="number" id="max_len" value="50" placeholder="生成长度" class="w-24 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white">
+                            <button onclick="generate()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition-all">
+                                生成
+                            </button>
+                        </div>
+                        <div id="generatedText" class="mt-4 p-4 bg-gray-800 rounded-lg text-green-400 font-mono text-sm min-h-[100px] whitespace-pre-wrap"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：训练监控 -->
+            <div class="space-y-6">
+                <div class="glass rounded-2xl p-6 border border-gray-700">
+                    <h2 class="text-2xl font-semibold mb-4 flex items-center">
+                        <span class="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
+                        训练状态
+                    </h2>
+                    
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="bg-gray-800 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-blue-400" id="stepDisplay">0</div>
+                            <div class="text-xs text-gray-500 uppercase tracking-wider">当前步数</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-purple-400" id="lossDisplay">-</div>
+                            <div class="text-xs text-gray-500 uppercase tracking-wider">损失值</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4 text-center">
+                            <div class="text-2xl font-bold text-green-400" id="statusDisplay">就绪</div>
+                            <div class="text-xs text-gray-500 uppercase tracking-wider">状态</div>
+                        </div>
+                    </div>
+
+                    <div class="relative h-64 w-full">
+                        <canvas id="lossChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 日志输出 -->
+                <div class="glass rounded-2xl p-6 border border-gray-700">
+                    <h2 class="text-xl font-semibold mb-4">系统日志</h2>
+                    <div id="logOutput" class="h-48 overflow-y-auto bg-gray-950 rounded-lg p-4 font-mono text-sm text-gray-400 space-y-1">
+                        <div class="text-gray-600">等待开始...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chart;
+        let statusInterval;
+
+        // 初始化图表
+        function initChart() {
+            const ctx = document.getElementById('lossChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Loss',
+                        data: [],
+                        borderColor: 'rgb(99, 102, 241)',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.6)' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.6)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function log(msg) {
+            const output = document.getElementById('logOutput');
+            const div = document.createElement('div');
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            div.className = 'text-gray-300';
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function uploadFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.error) {
+                    log(`上传失败: ${data.error}`);
+                } else {
+                    log(`上传成功: ${data.samples} 个样本, 词表大小: ${data.vocabSize}`);
+                    document.getElementById('uploadStatus').textContent = `已加载: ${file.name} (${data.samples} 样本)`;
+                }
+            } catch (err) {
+                log(`上传错误: ${err}`);
+            }
+        }
+
+        async function startTraining() {
+            const config = {
+                n_embd: parseInt(document.getElementById('n_embd').value),
+                n_layer: parseInt(document.getElementById('n_layer').value),
+                n_head: parseInt(document.getElementById('n_head').value),
+                block_size: parseInt(document.getElementById('block_size').value),
+                num_steps: parseInt(document.getElementById('num_steps').value),
+                learning_rate: parseFloat(document.getElementById('learning_rate').value)
+            };
+
+            try {
+                const res = await fetch('/api/train', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                const data = await res.json();
+                if (data.error) {
+                    log(`启动失败: ${data.error}`);
+                } else {
+                    log('训练开始...');
+                    document.getElementById('trainBtn').disabled = true;
+                    startStatusPolling();
+                }
+            } catch (err) {
+                log(`错误: ${err}`);
+            }
+        }
+
+        async function stopTraining() {
+            await fetch('/api/stop', { method: 'POST' });
+            log('训练停止请求已发送');
+        }
+
+        function startStatusPolling() {
+            if (statusInterval) clearInterval(statusInterval);
+            statusInterval = setInterval(async () => {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                document.getElementById('stepDisplay').textContent = data.step;
+                document.getElementById('lossDisplay').textContent = data.loss ? data.loss.toFixed(4) : '-';
+                document.getElementById('statusDisplay').textContent = data.isTraining ? '训练中' : '就绪';
+                document.getElementById('statusDisplay').className = `text-2xl font-bold ${data.isTraining ? 'text-yellow-400' : 'text-green-400'}`;
+
+                // 更新图表
+                if (data.history && data.history.length > 0) {
+                    chart.data.labels = data.history.map((_, i) => i + 1);
+                    chart.data.datasets[0].data = data.history;
+                    chart.update('none');
+                }
+
+                if (!data.isTraining && data.step >= data.totalSteps) {
+                    clearInterval(statusInterval);
+                    document.getElementById('trainBtn').disabled = false;
+                    log('训练完成');
+                }
+            }, 500);
+        }
+
+        async function generate() {
+            const prompt = document.getElementById('prompt').value;
+            const maxLen = parseInt(document.getElementById('max_len').value);
+            
+            try {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, max_len: maxLen })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    log(`生成失败: ${data.error}`);
+                } else {
+                    document.getElementById('generatedText').textContent = data.generated;
+                    log(`生成完成，长度: ${data.tokens} tokens`);
+                }
+            } catch (err) {
+                log(`生成错误: ${err}`);
+            }
+        }
+
+        // 初始化
+        initChart();
+    </script>
+</body>
+</html>
